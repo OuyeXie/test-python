@@ -41,54 +41,54 @@ class Sum_test( object ):
 
 
     def compute( self ):
-        print "a: " + str(self.a)
-        print "b: " + str(self.b)
+        print("a: " + str(self.a))
+        print("b: " + str(self.b))
         exact = 0.0
         for i in range(0, len(self.a)):
             if self.b[i] != 0:
                 exact += self.a[i]/self.b[i]
-        print "exact value: %f" % exact
+        print("exact value: %f" % exact)
         
-        print "#########################################"
+        print("#########################################")
             
         sum_a = sum(self.a)
-        print "sum_a: %f" % sum_a
+        print("sum_a: %f" % sum_a)
         
         sum_b = sum(self.b)
-        print "sum_b: %f" % sum_b
+        print("sum_b: %f" % sum_b)
         
         approximate = ((sum_a * len(self.a)) / sum_b)
-        print "approxiate value: %f" % approximate
+        print("approxiate value: %f" % approximate)
         
         gap = exact - approximate
-        print "gap value; %f" % gap
+        print("gap value; %f" % gap)
         
         gap_percentage = gap/exact
-        print "gap percentage value: %f%%" % (gap_percentage*100.0)
+        print("gap percentage value: %f%%" % (gap_percentage*100.0))
         
-        print "#########################################"
+        print("#########################################")
         
         sum_a = sum(self.a)
-        print "sum_a: %f" % sum_a
+        print("sum_a: %f" % sum_a)
         
         sum_b = sum([(1.0/item) for item in self.b if item != 0])
-        print "sum_b: %f" % sum_b
+        print("sum_b: %f" % sum_b)
         
         approximate = (sum_a * sum_b) / len(self.a)
-        print "approxiate value: %f" % approximate
+        print("approxiate value: %f" % approximate)
         
         gap = exact - approximate
-        print "gap value; %f" % gap
+        print("gap value; %f" % gap)
         
         gap_percentage = gap/exact
-        print "gap percentage value: %f%%" % (gap_percentage*100.0)
+        print("gap percentage value: %f%%" % (gap_percentage*100.0))
 
 if __name__ == "__main__":
 
-    print "start computing"
-    sum_test = Sum_test();
+    print("start computing")
+    sum_test = Sum_test()
     sum_test.compute()
-    print "finish computing"
+    print("finish computing")
     
 
 

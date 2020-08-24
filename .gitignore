@@ -1,31 +1,5 @@
-# Compiled source #
-###################
-*.com
-*.class
-*.dll
-*.exe
-*.o
-*.so
+venv/
 
-# LOGs #
-########
-*.log
+.idea/
 
-# OS generated files #
-######################
-.DS_Store
-ehthumbs.db
-Icon?
-Thumbs.db
-*~
-
-dist/*.jar
-jars/*.jar
-*.jar
-data/database
-target/
-log/
-
-.classpath
-.project
 
