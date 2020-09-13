@@ -30,6 +30,24 @@ class GluonCrash:
         #     passed as the `activation` argument, `weight` is a weights matrix
         #     created by the layer, and `bias` is a bias vector created by the layer
         #     (only applicable if `use_bias` is `True`).
+        # Parameters
+        #     ----------
+        #     units : int
+        #         Dimensionality of the output space.
+        #     in_units : int, optional
+        #         Size of the input data. If not specified, initialization will be
+        #         deferred to the first time `forward` is called and `in_units`
+        #         will be inferred from the shape of input data.
+        # Inputs:
+        #         - **data**: if `flatten` is True, `data` should be a tensor with shape
+        #           `(batch_size, x1, x2, ..., xn)`, where x1 * x2 * ... * xn is equal to
+        #           `in_units`. If `flatten` is False, `data` should have shape
+        #           `(x1, x2, ..., xn, in_units)`.
+        #
+        # Outputs:
+        #         - **out**: if `flatten` is True, `out` will be a tensor with shape
+        #           `(batch_size, units)`. If `flatten` is False, `out` will have shape
+        #           `(x1, x2, ..., xn, units)`.
         layer = nn.Dense(2)
         print("declaration")
         print(layer)
@@ -189,11 +207,101 @@ class GluonCrash:
         print(net.dense.weight.data().shape)
 
 
+    # MixMLP(
+    #   (blk0): Sequential(
+    #     (0): Conv2D(None -> 6, kernel_size=(5, 5), stride=(1, 1), Activation(relu))
+    #     (1): MaxPool2D(size=(2, 2), stride=(2, 2), padding=(0, 0), ceil_mode=False, global_pool=False, pool_type=max, layout=NCHW)
+    #   )
+    #   (blk1): Sequential(
+    #     (0): Conv2D(None -> 16, kernel_size=(3, 3), stride=(1, 1), Activation(relu))
+    #     (1): MaxPool2D(size=(2, 2), stride=(2, 2), padding=(0, 0), ceil_mode=False, global_pool=False, pool_type=max, layout=NCHW)
+    #   )
+    #   (dense0): Dense(None -> 120, Activation(relu))
+    #   (dense1): Dense(None -> 84, Activation(relu))
+    #   (dense2): Dense(None -> 10, linear)
+    # )
+    # x shape (4, 1, 28, 28)
+    # blk 0-0 shape ((6, 1, 5, 5), (6,))
+    # blk 0 result shape (4, 6, 12, 12)
+    # blk 1-0 shape ((16, 6, 3, 3), (16,))
+    # blk 0 result shape (4, 16, 5, 5)
+    # dense 0 shape ((120, 400), (120,))
+    # dense 0 result shape (4, 120)
+    # dense 1 shape ((84, 120), (84,))
+    # dense 1 result shape (4, 84)
+    # dense 2 shape ((10, 84), (10,))
+    # dense 2 result shape (4, 10)
+    # y shape (4, 10)
+    # y
+    # [[-0.00525905 -0.00061266 -0.00537567 -0.00111964  0.00321069 -0.00222969
+    #   -0.00345072  0.00083281 -0.00227492 -0.00129272]
+    #  [-0.00469876 -0.00015404 -0.00548729 -0.00192122  0.00372589 -0.00208581
+    #   -0.00302593  0.00175308 -0.00210345 -0.00071133]
+    #  [-0.00470831 -0.00064738 -0.00581248 -0.00120577  0.00372367 -0.0019953
+    #   -0.00276755  0.00097445 -0.00215606 -0.00058186]
+    #  [-0.0049872  -0.00120375 -0.00555822 -0.00121179  0.00334217 -0.00201681
+    #   -0.00269017  0.00139254 -0.00257135 -0.00025123]]
+    # <NDArray 4x10 @cpu(0)>
+    def testNNChainFlexiblyMore(self):
+        class MixMLP(nn.Block):
+            def __init__(self, **kwargs):
+                # Run `nn.Block`'s init method
+                super(MixMLP, self).__init__(**kwargs)
+                self.blk0 = nn.Sequential()
+                self.blk0.add(nn.Conv2D(channels=6, kernel_size=5, activation='relu'),
+                              nn.MaxPool2D(pool_size=2, strides=2))
+                self.blk1 = nn.Sequential()
+                self.blk1.add(nn.Conv2D(channels=16, kernel_size=3, activation='relu'),
+                              nn.MaxPool2D(pool_size=2, strides=2))
+                self.dense0 = nn.Dense(120, activation="relu")
+                self.dense1 = nn.Dense(84, activation="relu")
+                self.dense2 = nn.Dense(10)
+
+            def forward(self, x):
+                blk0Result = self.blk0(x)
+                print("blk {} shape {}".format("0-0",
+                                                 (self.blk0[0].weight.data().shape, self.blk0[0].bias.data().shape)))
+                print("blk {} result shape {}".format(0, blk0Result.shape))
+
+                blk1Result = self.blk1(blk0Result)
+                print("blk {} shape {}".format("1-0",
+                                                 (self.blk1[0].weight.data().shape, self.blk1[0].bias.data().shape)))
+                print("blk {} result shape {}".format(0, blk1Result.shape))
+
+                dense0Result = self.dense0(blk1Result)
+                print("dense {} shape {}".format(0,
+                                               (self.dense0.weight.data().shape, self.dense0.bias.data().shape)))
+                print("dense {} result shape {}".format(0, dense0Result.shape))
+
+                dense1Result = self.dense1(dense0Result)
+                print("dense {} shape {}".format(1,
+                                                 (self.dense1.weight.data().shape, self.dense1.bias.data().shape)))
+                print("dense {} result shape {}".format(1, dense1Result.shape))
+
+                dense2Result = self.dense2(dense1Result)
+                print("dense {} shape {}".format(2,
+                                                 (self.dense2.weight.data().shape, self.dense2.bias.data().shape)))
+                print("dense {} result shape {}".format(2, dense2Result.shape))
+
+                return dense2Result
+
+        net = MixMLP()
+        print(net)
+
+        net.initialize()
+        x = nd.random.uniform(shape=(4, 1, 28, 28))
+        print("x shape {}".format(x.shape))
+        y = net(x)
+        print("y shape {}".format(y.shape))
+        print("y {}".format(y))
+
+
 if __name__ == "__main__":
     gluonCrash: GluonCrash = GluonCrash()
     # gluonCrash.testNdArray()
     # gluonCrash.testNNDense()
-    gluonCrash.testNNConv2D()
-    gluonCrash.testNNConv2DWithMaxPooling()
     # gluonCrash.testNNChain()
+    # gluonCrash.testNNConv2D()
+    # gluonCrash.testNNConv2DWithMaxPooling()
     # gluonCrash.testNNChainFlexibly()
+    gluonCrash.testNNChainFlexiblyMore()
