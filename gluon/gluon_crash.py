@@ -1,4 +1,4 @@
-from mxnet import nd, random
+from mxnet import nd, random, autograd
 from mxnet.gluon import nn
 
 
@@ -295,13 +295,45 @@ class GluonCrash:
         print("y shape {}".format(y.shape))
         print("y {}".format(y))
 
+    def testAutoGrad(self):
+        # simple
+        x = nd.array([[1, 2], [3, 4]])
+        x.attach_grad()
+        with autograd.record():
+            y = 2 * x * x
+        y.backward() # When y has more than one entry, y.backward() is equivalent to y.sum().backward().
+        print(x.grad)
+
+        def f(a):
+            b = a * 2
+            while b.norm().asscalar() < 1000:
+                b = b * 2
+            if b.sum().asscalar() >= 0:
+                c = b[0]
+            else:
+                c = b[1]
+            return c
+
+        # dynamic
+        a = nd.random.uniform(shape=2)
+        print(a)
+        a.attach_grad()
+        with autograd.record():
+            c = f(a)
+        c.backward()
+        print(c)
+        print((a.grad, c/a))
+
 
 if __name__ == "__main__":
     gluonCrash: GluonCrash = GluonCrash()
     # gluonCrash.testNdArray()
+
     # gluonCrash.testNNDense()
     # gluonCrash.testNNChain()
     # gluonCrash.testNNConv2D()
     # gluonCrash.testNNConv2DWithMaxPooling()
     # gluonCrash.testNNChainFlexibly()
-    gluonCrash.testNNChainFlexiblyMore()
+    # gluonCrash.testNNChainFlexiblyMore()
+
+    gluonCrash.testAutoGrad()
