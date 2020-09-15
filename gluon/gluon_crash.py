@@ -1,5 +1,9 @@
-from mxnet import nd, random, autograd
+from mxnet import nd, random, autograd, gluon, init
 from mxnet.gluon import nn
+from mxnet.gluon.data.vision import datasets, transforms
+from IPython import display
+import matplotlib.pyplot as plt
+import time
 
 
 class GluonCrash:
@@ -206,7 +210,6 @@ class GluonCrash:
         print(net.blk[1].weight.data().shape)
         print(net.dense.weight.data().shape)
 
-
     # MixMLP(
     #   (blk0): Sequential(
     #     (0): Conv2D(None -> 6, kernel_size=(5, 5), stride=(1, 1), Activation(relu))
@@ -260,17 +263,17 @@ class GluonCrash:
             def forward(self, x):
                 blk0Result = self.blk0(x)
                 print("blk {} shape {}".format("0-0",
-                                                 (self.blk0[0].weight.data().shape, self.blk0[0].bias.data().shape)))
+                                               (self.blk0[0].weight.data().shape, self.blk0[0].bias.data().shape)))
                 print("blk {} result shape {}".format(0, blk0Result.shape))
 
                 blk1Result = self.blk1(blk0Result)
                 print("blk {} shape {}".format("1-0",
-                                                 (self.blk1[0].weight.data().shape, self.blk1[0].bias.data().shape)))
+                                               (self.blk1[0].weight.data().shape, self.blk1[0].bias.data().shape)))
                 print("blk {} result shape {}".format(0, blk1Result.shape))
 
                 dense0Result = self.dense0(blk1Result)
                 print("dense {} shape {}".format(0,
-                                               (self.dense0.weight.data().shape, self.dense0.bias.data().shape)))
+                                                 (self.dense0.weight.data().shape, self.dense0.bias.data().shape)))
                 print("dense {} result shape {}".format(0, dense0Result.shape))
 
                 dense1Result = self.dense1(dense0Result)
@@ -301,7 +304,7 @@ class GluonCrash:
         x.attach_grad()
         with autograd.record():
             y = 2 * x * x
-        y.backward() # When y has more than one entry, y.backward() is equivalent to y.sum().backward().
+        y.backward()  # When y has more than one entry, y.backward() is equivalent to y.sum().backward().
         print(x.grad)
 
         def f(a):
@@ -322,7 +325,107 @@ class GluonCrash:
             c = f(a)
         c.backward()
         print(c)
-        print((a.grad, c/a))
+        print((a.grad, c / a))
+
+    def testTrainNNWithFashionMNIST(self):
+
+        # auxiliary function to calculate the model accuracy
+        def acc(output, label):
+            # output: (batch, num_output) float32 ndarray
+            # label: (batch, ) int32 ndarray
+            return (output.argmax(axis=1) ==
+                    label.astype('float32')).mean().asscalar()
+
+        mnist_train = datasets.FashionMNIST(train=True)
+        X, y = mnist_train[0]
+        # (height, width, channel)
+        # ('X shape: ', (28, 28, 1), 'X dtype', <class 'numpy.uint8'>, 'y:', 2)
+        print(('X shape: ', X.shape, 'X dtype', X.dtype, 'y:', y))
+
+        text_labels = ['t-shirt', 'trouser', 'pullover', 'dress', 'coat',
+                       'sandal', 'shirt', 'sneaker', 'bag', 'ankle boot']
+        X, y = mnist_train[0:10]
+        print(('X shape: ', X.shape, 'X dtype', X.dtype, 'y:', y))
+        # plot images
+        # display.set_matplotlib_formats('svg')
+        # _, figs = plt.subplots(1, X.shape[0], figsize=(15, 15))
+        # for f, x, yi in zip(figs, X, y):
+        #     # 3D->2D by removing the last channel dim
+        #     f.imshow(x.reshape((28, 28)).asnumpy())
+        #     ax = f.axes
+        #     ax.set_title(text_labels[int(yi)])
+        #     ax.title.set_fontsize(14)
+        #     ax.get_xaxis().set_visible(False)
+        #     ax.get_yaxis().set_visible(False)
+        # plt.show()
+
+        # In order to feed data into a Gluon model, we need to convert the images to the (channel, height, width) format with a floating point data type
+        transformer = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(0.13, 0.31)])
+        mnist_train = mnist_train.transform_first(transformer)
+        X, y = mnist_train[0:10]
+        print(('X shape: ', X.shape, 'X dtype', X.dtype, 'y:', y))
+
+        # get a (randomized) batch of examples
+        batch_size = 256
+        train_data = gluon.data.DataLoader(
+            mnist_train, batch_size=batch_size, shuffle=True, num_workers=4)
+        for data, label in train_data:
+            print(data.shape, label.shape)
+            break
+
+        # create a validation dataset and data loader
+        mnist_valid = gluon.data.vision.FashionMNIST(train=False)
+        # TODO: fix ValueError: ctypes objects containing pointers cannot be pickled
+        #  try Linux
+        valid_data = gluon.data.DataLoader(
+            mnist_valid.transform_first(transformer),
+            batch_size=batch_size, num_workers=4)
+
+        # Define the mode
+        net = nn.Sequential()
+        net.add(nn.Conv2D(channels=6, kernel_size=5, activation='relu'),
+                nn.MaxPool2D(pool_size=2, strides=2),
+                nn.Conv2D(channels=16, kernel_size=3, activation='relu'),
+                nn.MaxPool2D(pool_size=2, strides=2),
+                nn.Flatten(),
+                nn.Dense(120, activation="relu"),
+                nn.Dense(84, activation="relu"),
+                nn.Dense(10))
+        # changed the weight initialization method to Xavier
+        net.initialize(init=init.Xavier())
+
+        # use standard softmax cross entropy loss for classification problems
+        softmax_cross_entropy = gluon.loss.SoftmaxCrossEntropyLoss()
+
+        # standard stochastic gradient descent with constant learning rate of 0.1
+        trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': 0.1})
+
+        # training loop
+        for epoch in range(10):
+            train_loss, train_acc, valid_acc = 0., 0., 0.
+            tic = time.time()
+            for data, label in train_data:
+                # forward + backward
+                with autograd.record():
+                    output = net(data)
+                    loss = softmax_cross_entropy(output, label)
+                loss.backward()
+                # update parameters
+                trainer.step(batch_size)
+                # calculate training metrics
+                train_loss += loss.mean().asscalar()
+                train_acc += acc(output, label)
+            # calculate validation accuracy
+            for data, label in valid_data:
+                valid_acc += acc(net(data), label)
+            print("Epoch %d: loss %.3f, train acc %.3f, test acc %.3f, in %.1f sec" % (
+                epoch, train_loss / len(train_data), train_acc / len(train_data),
+                valid_acc / len(valid_data), time.time() - tic))
+
+        # save the trained parameters onto disk
+        net.save_parameters('net.params')
 
 
 if __name__ == "__main__":
@@ -336,4 +439,6 @@ if __name__ == "__main__":
     # gluonCrash.testNNChainFlexibly()
     # gluonCrash.testNNChainFlexiblyMore()
 
-    gluonCrash.testAutoGrad()
+    # gluonCrash.testAutoGrad()
+
+    gluonCrash.testTrainNNWithFashionMNIST()
