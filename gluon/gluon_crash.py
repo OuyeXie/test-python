@@ -1,6 +1,9 @@
-from mxnet import nd, random, autograd, gluon, init
+from mxnet import nd, random, autograd, gluon, init, image, gpu
 from mxnet.gluon import nn
 from mxnet.gluon.data.vision import datasets, transforms
+from mxnet.gluon.model_zoo import vision as models
+from mxnet.gluon.utils import download
+
 from IPython import display
 import matplotlib.pyplot as plt
 import time
@@ -327,6 +330,7 @@ class GluonCrash:
         print(c)
         print((a.grad, c / a))
 
+    # run on linux
     def testTrainNNWithFashionMNIST(self):
 
         # auxiliary function to calculate the model accuracy
@@ -426,6 +430,7 @@ class GluonCrash:
         # save the trained parameters onto disk
         net.save_parameters('net.params')
 
+    # run on linux
     def testPredictNNWithSavedParams(self):
         # copy a simple model’s definition
         net = nn.Sequential()
@@ -448,12 +453,11 @@ class GluonCrash:
         mnist_valid = datasets.FashionMNIST(train=False)
         X, Y = mnist_valid[:10]
         preds = []
-        for x, y in zip(X,Y):
+        for x, y in zip(X, Y):
             x = transformer(x).expand_dims(axis=0)
             pred = net(x).argmax(axis=1)
             preds.append((pred.astype('int32').asscalar(), y))
         print(preds)
-
 
         # _, figs = plt.subplots(1, 10, figsize=(15, 15))
         # text_labels = ['t-shirt', 'trouser', 'pullover', 'dress', 'coat',
@@ -467,6 +471,47 @@ class GluonCrash:
         #     ax.get_xaxis().set_visible(False)
         #     ax.get_yaxis().set_visible(False)
         # plt.show()
+
+    def testPredictNNWithResNet50V2(self):
+        # ResNet-50 V2 model was trained on the ImageNet dataset
+        net = models.resnet50_v2(pretrained=True)
+
+        url = 'http://data.mxnet.io/models/imagenet/synset.txt'
+        fname = download(url)
+        with open(fname, 'r') as f:
+            text_labels = [' '.join(l.split()[1:]) for l in f]
+
+        url = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/" + \
+              "Golden_Retriever_medium-to-light-coat.jpg/" + \
+              "365px-Golden_Retriever_medium-to-light-coat.jpg"
+        fname = download(url)
+        x = image.imread(fname)
+
+        x = image.resize_short(x, 256)
+        x, _ = image.center_crop(x, (224, 224))
+
+        # plt.imshow(x.asnumpy())
+        # plt.show()
+
+        def transform(data):
+            data = data.transpose((2, 0, 1)).expand_dims(axis=0)
+            rgb_mean = nd.array([0.485, 0.456, 0.406]).reshape((1, 3, 1, 1))
+            rgb_std = nd.array([0.229, 0.224, 0.225]).reshape((1, 3, 1, 1))
+            return (data.astype('float32') / 255 - rgb_mean) / rgb_std
+
+        prob = net(transform(x)).softmax()
+        idx = prob.topk(k=5)[0]
+        for i in idx:
+            i = int(i.asscalar())
+            print('With prob = %.5f, it contains %s' % (
+                prob[0, i].asscalar(), text_labels[i]))
+
+    # TODO: test GPU with hoverboard cluster?
+    # def testGpuBasics(self):
+    #     x = nd.ones((3, 4), ctx=gpu())
+    #     print(x)
+
+
 
 if __name__ == "__main__":
     gluonCrash: GluonCrash = GluonCrash()
@@ -483,4 +528,8 @@ if __name__ == "__main__":
     # gluonCrash.testAutoGrad()
 
     # gluonCrash.testTrainNNWithFashionMNIST()
-    gluonCrash.testPredictNNWithSavedParams()
+
+    # gluonCrash.testPredictNNWithSavedParams()
+    gluonCrash.testPredictNNWithResNet50V2()
+
+    # gluonCrash.testGpuBasics()
