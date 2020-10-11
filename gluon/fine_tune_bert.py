@@ -103,13 +103,15 @@ class FineTuneBert:
         print('valid length = \n%s' % self.data_train[sample_id][2])
         print('label = \n%s' % self.data_train[sample_id][3])
 
-        # Fine-tuning the model
-
+    # use a fixed learning rate and skip the validation steps. For the optimizer, we leverage the ADAM optimizer which performs very well for NLP data and for BERT models in particular.
     def fineTune(self):
         batch_size = 32
         lr = 5e-6
 
         # The FixedBucketSampler and the DataLoader for making the mini-batches
+        #   Assign each data sample to a fixed bucket based on its length.
+        #   The bucket keys are either given or generated from the input sequence lengths
+        #   example can be found from sampler_test.py
         train_sampler = nlp.data.FixedBucketSampler(lengths=[int(item[2]) for item in self.data_train],
                                                     batch_size=batch_size,
                                                     shuffle=True)
@@ -133,7 +135,7 @@ class FineTuneBert:
             for batch_id, (token_ids, segment_ids, valid_length, label) in enumerate(bert_dataloader):
                 with mx.autograd.record():
 
-                    # Load the data to the GPU
+                    # Load the data to the CPU
                     token_ids = token_ids.as_in_context(self.ctx)
                     valid_length = valid_length.as_in_context(self.ctx)
                     segment_ids = segment_ids.as_in_context(self.ctx)
@@ -171,4 +173,4 @@ if __name__ == "__main__":
     fineTuneBert = FineTuneBert()
 
     fineTuneBert.preProcess()
-    fineTuneBert.fineTune()
+    # fineTuneBert.fineTune()
