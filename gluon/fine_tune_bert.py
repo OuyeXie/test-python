@@ -11,6 +11,7 @@ from sentence_embedding.bert import data
 
 nlp.utils.check_version('0.8.1')
 
+#  fine-tuning with the pre-trained BERT model to classify semantically equivalent sentence pairs
 class FineTuneBert:
     np.random.seed(100)
     random.seed(100)
@@ -117,6 +118,12 @@ class FineTuneBert:
                                                     shuffle=True)
         bert_dataloader = mx.gluon.data.DataLoader(self.data_train, batch_sampler=train_sampler)
 
+        # params : ParameterDict
+        #         The set of parameters to optimize.
+        # optimizer : str or Optimizer
+        #         https://mxnet.apache.org/versions/1.7.0/api/python/docs/api/optimizer/index.html#mxnet.optimizer.Adam
+        # optimizer_params : dict
+        #         Key-word arguments to be passed to optimizer constructor
         trainer = mx.gluon.Trainer(self.bert_classifier.collect_params(), 'adam',
                                    {'learning_rate': lr, 'epsilon': 1e-9})
 
@@ -133,9 +140,11 @@ class FineTuneBert:
             self.metric.reset()
             step_loss = 0
             for batch_id, (token_ids, segment_ids, valid_length, label) in enumerate(bert_dataloader):
+                # Returns an autograd recording scope context to be used in ‘with’ statement and captures code that needs gradients to be calculated.
                 with mx.autograd.record():
 
                     # Load the data to the CPU
+                    # might not necessary if using CPU (ouyexie)
                     token_ids = token_ids.as_in_context(self.ctx)
                     valid_length = valid_length.as_in_context(self.ctx)
                     segment_ids = segment_ids.as_in_context(self.ctx)
